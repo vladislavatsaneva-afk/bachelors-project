@@ -1,0 +1,186 @@
+﻿@model MetricConverter.Models.ConversionModel
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Конвертор</title>
+    <style>
+        body {
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            transition: background-image 0.6s ease;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="menu">
+        <nav>
+            <a href="/">Начална страница</a>
+            <a asp-controller="Login" asp-action="Logout">Изход от профил</a>
+        </nav>
+    </header>
+
+    <form asp-action="Converter" method="post">
+        <div>
+            <label>Мерна единица:</label>
+            <select id="conversionType" asp-for="ConversionType" onchange="updateUnits()">
+                @{
+                    var options = new[] {
+                        "Разстояние", "Тегло", "Температура", "Обем", "Скорост",
+                        "Време", "Валута", "Площ", "Енергия", "Мощност",
+                        "Налягане", "Сила", "Честота", "Информация", "Светлина"
+                    };
+                }
+                @foreach (var opt in options)
+                {
+                    <option value="@opt" selected="@(Model.ConversionType == opt ? "selected" : null)">
+                        @opt
+                    </option>
+                }
+            </select>
+        </div>
+        <div>
+            <label>Стойност:</label>
+            <input asp-for="Value" type="number" step="any" value="@Model.Value" />
+        </div>
+        <div>
+            <label>От:</label>
+            <select id="FromUnit" asp-for="FromUnit" value="@Model.FromUnit"></select>            
+        </div>
+        <div>
+            <label>В:</label>
+            <select id="ToUnit" asp-for="ToUnit" value="@Model.ToUnit"></select>
+        </div>
+        <button type="submit">Преобразувай</button>                
+        @if (ViewBag.Result != null)
+        {
+            <div class="result">
+                <h2>Резултат: @ViewBag.Result</h2>
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(Model.WarningMessage))
+        {
+            <div class="alert alert-warning" role="alert">
+                @Model.WarningMessage
+            </div>
+        }
+    </form>
+    
+    @if (Model.History != null && Model.History.Any())
+    {
+        <div class="table">
+            <table>
+                <thead>
+                    <tr>
+                        <th colspan="10" style="text-align: center; font-size: 1.5em; padding: 10px 0;">История на преобразуванията</th>
+                    </tr>
+                    <tr>
+                        <th>Категория</th>
+                        <th>Стойност</th>
+                        <th>От</th>
+                        <th>В</th>
+                        <th>Резултат</th>
+                        <th>Дата</th>
+                        <th>Действие</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in Model.History)
+                    {
+                        <tr>
+                            <td>@entry.ConversionType</td>
+                            <td>@entry.InputValue</td>
+                            <td>@entry.FromUnit</td>
+                            <td>@entry.ToUnit</td>
+                            <td>@entry.Result</td>
+                            <td>@entry.DateTime</td>                            
+                            <td>
+                                <form asp-action="DeleteHistoryEntry" method="post">
+                                    <input type="hidden" name="id" value="@entry.ID" />
+                                    <button type="submit" onclick="return confirm('Сигурни ли сте, че искате да изтриете този запис?');">Изтрий</button>
+                                </form>
+                            </td>
+                            
+                        </tr>
+                    }
+                </tbody>
+            </table>        
+            <div class="button-container">
+                <a href="/Conversion/DownloadHistory" class="btn">Изтегли историята в Excel файл</a>
+            </div>
+        </div>
+    }
+
+    <script>
+        const units = {
+            Разстояние: ["Миля", "Милиметър", "Сантиметър", "Метър", "Километър"],
+            Тегло: ["Фунт", "Милиграм", "Грам", "Килограм", "Тон"],
+            Температура: ["Целзий", "Келвин", "Фаренхайт"],
+            Обем: ["Унции", "Милилитър", "Литър", "Килолитър"],
+            Скорост: ["Миля в час", "Километър в час", "Метър в секунда"],
+            Време: ["Секунда", "Минута", "Час", "Ден", "Седмица", "Месец", "Година"],
+            Валута: ["Лев", "Евро", "Долар", "Лира"],
+            Площ: ["Квадратен метър", "Квадратен километър", "Декар", "Хектар"],
+            Енергия: ["Калория", "Килокалория", "Килоджаул"],
+            Мощност: ["Ват", "Киловат", "Мегават", "Гигават"],
+            Налягане: ["Бар", "Атмосфера"],
+            Сила: ["Нютон", "Килонютон", "Понд", "Килопонд"],
+            Честота: ["Херц", "Килохерц", "Мегахерц", "Гигахерц"],
+            Информация: ["Бит", "Килобит", "Мегабит", "Гигабит", "Байт", "Килобайт", "Мегабайт", "Гигабайт", "Терабайт"],
+            Светлина: ["Миля", "Километър", "Парсек", "Светлинна година"]
+        };
+        const backgrounds = {
+                "Разстояние": "url('/images/distance.jpg')",
+                "Тегло": "url('/images/weight.jpg')",
+                "Температура": "url('/images/temperature.jpg')",
+                "Обем": "url('/images/volume.jpg')",
+                "Скорост": "url('/images/velocity.jpg')",
+                "Време": "url('/images/time.jpg')",
+                "Валута": "url('/images/currency.jpg')",
+                "Площ": "url('/images/area.jpg')",
+                "Енергия": "url('/images/energy.jpg')",
+                "Мощност": "url('/images/power.jpg')",
+                "Налягане": "url('/images/pressure.jpg')",
+                "Сила": "url('/images/force.jpg')",
+                "Честота": "url('/images/frequency.jpg')",
+                "Информация": "url('/images/data.jpg')",
+                "Светлина": "url('/images/light.jpg')"
+        };
+
+        function updateUnits() {
+            const conversionType = document.getElementById("conversionType").value;
+            const fromUnit = document.getElementById("FromUnit");
+            const toUnit = document.getElementById("ToUnit");
+            const selectedFrom = "@Model.FromUnit";
+            const selectedTo = "@Model.ToUnit";
+            fromUnit.innerHTML = "";
+            toUnit.innerHTML = "";
+            
+            if (units[conversionType]) {
+            units[conversionType].forEach(unit => {
+                const fromOption = document.createElement("option");
+                fromOption.value = unit;
+                fromOption.text = unit;
+                if (unit === selectedFrom) fromOption.selected = true;
+                fromUnit.appendChild(fromOption);
+
+                const toOption = document.createElement("option");
+                toOption.value = unit;
+                toOption.text = unit;
+                if (unit === selectedTo) toOption.selected = true;
+                toUnit.appendChild(toOption);
+                });
+            }
+       
+            document.body.style.backgroundImage = backgrounds[conversionType] || "none";
+            window.onload = updateUnits;
+        }    
+        document.addEventListener("DOMContentLoaded", updateUnits);
+    </script>
+</body>
+</html>
